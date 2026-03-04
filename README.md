@@ -1,92 +1,90 @@
 # effect-react
 
-Effect.ts integration for React. Provides hooks and a runtime that mirror React's built-in hooks (including React 19 patterns) while running logic as Effect programs with typed errors, composition, and Scope-based cleanup.
+Effect.ts integration for React. This library provides React hooks that run your logic as Effect programs instead of raw Promises or ad hoc async code. You get typed errors, composition, and Scope-based cleanup while keeping the same mental model as React’s built-in hooks.
 
 **npm package:** `effect-react` (the name `react-effect` is taken on npm). Install with `bun add effect-react` or `npm i effect-react`.
 
-## Design choices
+---
 
-### 1. Runtime: shared runtime (Option B)
+## What this library does
 
-Effects are **not** run ad hoc inside each hook with `Effect.runPromise` in place. Instead, a **React context provides an Effect runtime**. Hooks submit Effects to that runtime and subscribe to their result.
+- **Shared runtime:** A React context supplies a single Effect runtime. Your app (or a subtree) wraps with `<EffectRuntimeProvider>`. All hooks use that runtime to run or fork Effects. You configure Layers/Services and resource lifecycle in one place.
+- **Explicit async state:** Async hooks expose a small state machine: Idle, Pending, Success, Failure. Success and failure carry typed values and errors (`E`), so you avoid overloading a single `error` slot with `unknown`.
+- **Scope-based cleanup:** When a hook runs an Effect that should be cancellable (e.g. `useRunEffect`), it allocates a Scope, runs the Effect in that Scope, and closes the Scope on unmount or when dependencies change. That gives you the same cleanup semantics as in pure Effect code (interruption, finalizers).
+- **API aligned with React:** Hooks mirror React’s built-in hooks (including React 19–style patterns). The async/effectful part is expressed as an `Effect`; the hook shapes stay familiar.
 
-- **Why:** Single place to configure Layers/Services, shared cancellation and resource lifecycle, and consistent behavior across the tree.
-- **Implication:** The app (or a subtree) must wrap with `<EffectRuntimeProvider>`. The provider holds a `Runtime<R>` (default or with layers). Hooks consume the runtime via `useEffectRuntime()` and use it to run or fork Effects.
+---
 
-### 2. Pending / success / error state
+## Limited scope
 
-Async hooks expose a small state machine so success, failure, and “in progress” are explicit and type-safe:
+This library is **not** a full “Effect-first” React framework. It does **not**:
 
-- **Idle** – no run yet (for useActionState-style hooks).
-- **Pending** – Effect is running.
-- **Success** – Effect succeeded; value is available.
-- **Failure** – Effect failed; typed error `E` is available.
+- Replace or reimplement React’s data flow, Suspense, or Server Components.
+- Provide Effect-based routing, data fetching, or form libraries.
+- Change how you structure your React tree or component hierarchy.
 
-So the hook’s “state” is one of `{ _tag: 'idle' } | { _tag: 'pending' } | { _tag: 'success', value: A } | { _tag: 'failure', error: E }`. This aligns with Effect’s `E` and avoids overloading a single `error` slot with `unknown`.
+It **only**:
 
-### 3. Cleanup: Scope
+- Lets you run Effect programs from React hooks via a shared runtime.
+- Provides hook variants that mirror `useTransition`, `useActionState`, `useOptimistic`, `useEffect`, `useState`, and `useReducer`, with the async/effectful part implemented as Effects and with typed errors and Scope cleanup where applicable.
 
-Cleanup uses **Scope**, not ad hoc `AbortController` or fiber references only.
+Use it when you already use Effect and want consistent Effect semantics (errors, resources, cancellation) at the React boundary. If you don’t use Effect, this library is not for you.
 
-- When a hook starts an Effect that should be cancellable (e.g. `useRunEffect`), it:
-  1. Allocates a Scope (via the runtime).
-  2. Runs the Effect in that Scope (e.g. `Scope.extend(scope, effect)` or equivalent).
-  3. On unmount or when deps change, **closes the Scope** (e.g. `Scope.close(scope, Exit.void)`).
+---
 
-- Closing the Scope interrupts any fibers and runs finalizers in that scope, so subscriptions, timers, and other resources are cleaned up in the same way as in pure Effect code.
+## When it’s useful
 
-### 4. API shape: mirror React’s hooks
+- You use **Effect** elsewhere (services, layers, typed errors) and want the same runtime and semantics in React (e.g. in event handlers, transitions, or effects).
+- You want **typed errors** and explicit Idle/Pending/Success/Failure state in async hooks instead of overloading `error: unknown`.
+- You want **Scope-based cleanup** (interruption, finalizers) for Effects started from hooks, instead of ad hoc `AbortController` or manual cleanup.
+- You prefer hook APIs that **mirror** React’s `useTransition`, `useActionState`, `useOptimistic`, etc., so the learning curve is small.
 
-Hooks are designed to **closely match** the corresponding React hooks, with Effect as the implementation detail:
+---
 
-- **useTransition** → **useTransitionEffect**: `[isPending, startTransition]`; `startTransition` accepts a function that runs an `Effect` (sync or async). Pending is derived from the Effect run.
-- **useActionState** → **useActionStateEffect**: `[state, dispatchAction, isPending]`; the “action” is an Effect; state/error/isPending come from the last run.
-- **useOptimistic** → **useOptimisticEffect**: `[optimisticState, setOptimistic]`; the “commit” runs an Effect; on success we commit, on failure we revert.
-- **useEffect** → **useRunEffect**: `(effect, deps)`; runs the Effect in a Scope and closes the Scope on cleanup.
-- **useState** (with Effect setter) → **useEffectState**: like useState, but the setter can accept a value, an updater function, or an `Effect<A, E, R>`; when an Effect is passed, it’s run and the result (or error) drives state.
-- **useReducer** (with Effect reducer) → **useEffectReducer**: like useReducer, but the reducer returns `Effect<NextState, E, R>`; dispatch runs that Effect and updates state from the result.
+## Hooks
 
-So the **mental model** for React developers is “same hooks, but the async/effectful part is an Effect.” We do not invent a parallel API; we keep names and signatures close and document the small differences (e.g. action is `() => Effect<...>` or `(prev, payload) => Effect<...>`).
+| React hook        | effect-react hook           | Notes |
+|-------------------|-----------------------------|--------|
+| `useTransition`   | `useTransitionEffect`       | `[isPending, startTransition]`; `startTransition` runs an `Effect`. |
+| `useActionState`  | `useActionStateEffect`      | `[state, dispatchAction, isPending]`; the action is an `Effect`; state/error/isPending from last run. |
+| `useOptimistic`   | `useOptimisticEffect`       | `[optimisticState, setOptimistic]`; commit runs an `Effect`; on success commit, on failure revert. |
+| `useEffect`       | `useRunEffect`              | `(effect, deps)`; runs the Effect in a Scope; Scope is closed on cleanup. |
+| `useState`        | `useEffectState`            | Setter accepts a value, an updater function, or an `Effect`; when an Effect is passed, it’s run and result/error drive state. |
+| `useReducer`      | `useEffectReducer`          | Reducer returns `Effect<NextState, E, R>`; dispatch runs that Effect and updates state from the result. |
 
-### 5. useOptimistic
+Async state is represented as: `{ _tag: 'idle' } | { _tag: 'pending' } | { _tag: 'success', value: A } | { _tag: 'failure', error: E }`. Helpers: `idle`, `pending`, `success`, `failure`, `isIdle`, `isPending`, `isSuccess`, `isFailure` (from `AsyncState`).
 
-Optimistic state is “show X immediately, then run an Effect; on success commit, on failure revert.” The hook manages:
-
-- Committed state (last confirmed value).
-- Optimistic state (what the UI shows).
-- In-flight Effect; on success we commit the optimistic value (or the result), on failure we revert to the previous committed state.
-
-The “action” is expressed as an Effect so success/failure and typing are consistent with the rest of the stack.
-
-### 6. useState / useReducer
-
-- **useEffectState**: setter can be called with `A`, `(prev: A) => A`, or `Effect<A, E, R>`. When an Effect is passed, the hook runs it (via the runtime), then sets state to the success value or exposes the error (e.g. in a separate error state or in the same state machine).
-- **useEffectReducer**: reducer has shape `(state, action) => Effect<NextState, E, R>`. Dispatch runs that Effect and updates state from the result; error and isPending can be exposed the same way as in useActionStateEffect.
-
-Request ordering / cancellation (e.g. “cancel previous when dispatch is called again”) can be added on top of this by having the runtime or the hook track the current run and interrupt or ignore stale completions.
-
-## File layout
-
-- **README.md** (this file) – design choices and usage.
-- **AsyncState.ts** – `AsyncState<A, E>` and helpers: `idle`, `pending`, `success`, `failure`, `isIdle`, `isPending`, `isSuccess`, `isFailure`.
-- **EffectRuntime.tsx** – React context for the Effect runtime and `EffectRuntimeProvider` / `useEffectRuntime`.
-- **useRunEffect.ts** – run an Effect when deps change; cleanup by closing the Scope.
-- **useTransitionEffect.ts** – `[isPending, startTransition]`; startTransition runs an Effect.
-- **useActionStateEffect.ts** – `[state, dispatchAction, isPending]`; action is an Effect.
-- **useOptimisticEffect.ts** – `[optimisticState, setOptimistic]`; commit/revert via Effect.
-- **useEffectState.ts** – useState with setter that can take a value, updater, or Effect.
-- **useEffectReducer.ts** – useReducer with reducer that returns an Effect.
-- **index.ts** – re-exports.
+---
 
 ## Usage
 
-1. Wrap the app (or subtree) with `EffectRuntimeProvider`. Optionally pass a custom `Runtime<R>` or build one from Layers.
-2. Use the hooks inside that tree: `useEffectRuntime()` for the runtime, and the effect hooks as needed.
-3. For hooks that need `R` (e.g. `HttpClient`), ensure the provider’s runtime is built with the required layers so that `Effect<A, E, R>` can be run.
+1. Wrap your app (or the subtree that uses these hooks) with `<EffectRuntimeProvider>`. Optionally pass a custom `Runtime<R>` (e.g. built from Layers).
+2. Use the hooks inside that tree. For hooks that require services `R`, build the provider’s runtime with the right Layers so `Effect<A, E, R>` can be run.
+
+No React 19 requirement; the API is designed so that when you move to React 19, the same patterns align with the built-in hooks.
+
+---
+
+## Design (summary)
+
+- **Runtime:** One shared runtime from context; hooks submit Effects to it. Single place for Layers/Services and resource lifecycle.
+- **Cleanup:** Scope is used for cancellable runs; closing the Scope on unmount/deps change interrupts fibers and runs finalizers.
+- **API:** Hook names and signatures stay close to React’s; the only difference is that the async/effectful part is an `Effect`.
+
+---
+
+## File layout
+
+- `AsyncState.ts` – `AsyncState<A, E>` and helpers.
+- `EffectRuntime.tsx` – Context, `EffectRuntimeProvider`, `useEffectRuntime`.
+- `useRunEffect.ts`, `useTransitionEffect.ts`, `useActionStateEffect.ts`, `useOptimisticEffect.ts`, `useEffectState.ts`, `useEffectReducer.ts` – hook implementations.
+- `index.ts` – re-exports.
+
+---
 
 ## Dependencies
 
 - `effect` – Effect core (Runtime, Scope, Effect, Fiber, etc.).
-- `react` – for context, hooks, and types.
+- `react` – context, hooks, types.
 
-No React 19 requirement; the API is designed so that when you upgrade to React 19, the same patterns (useTransition, useActionState, useOptimistic) align with the built-in hooks.
+Peer dependencies: `effect` >= 3.0.0, `react` >= 18.0.0.
