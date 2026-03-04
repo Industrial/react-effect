@@ -1,12 +1,9 @@
-import { Effect, Runtime } from "effect";
-import { useCallback, useRef, useState } from "react";
-import { useEffectRuntime } from "./EffectRuntime";
+import { Effect, Runtime } from 'effect'
+import { useCallback, useRef, useState } from 'react'
+import { useEffectRuntime } from './EffectRuntime'
 
 /** Accepted argument for the setter returned by {@link useEffectState}. */
-type SetStateAction<A, E, R> =
-	| A
-	| ((prev: A) => A)
-	| Effect.Effect<A, E, R>;
+type SetStateAction<A, E, R> = A | ((prev: A) => A) | Effect.Effect<A, E, R>
 
 /**
  * Mirrors React's `useState`, but the setter can accept a value, an updater
@@ -37,38 +34,38 @@ type SetStateAction<A, E, R> =
  * ```
  */
 export function useEffectState<A, E = unknown, R = never>(
-	initialState: A | (() => A),
-	onError?: (error: E) => void,
+  initialState: A | (() => A),
+  onError?: (error: E) => void,
 ): [A, (action: SetStateAction<A, E, R>) => void] {
-	const { runtime } = useEffectRuntime<R>();
-	const [state, setState] = useState<A>(initialState);
-	const runCountRef = useRef(0);
+  const { runtime } = useEffectRuntime<R>()
+  const [state, setState] = useState<A>(initialState)
+  const runCountRef = useRef(0)
 
-	const set = useCallback(
-		(action: SetStateAction<A, E, R>) => {
-			if (Effect.isEffect(action)) {
-				const runId = ++runCountRef.current;
-				Runtime.runPromise(runtime)(action as Effect.Effect<A, E, R>)
-					.then((value) => {
-						if (runId === runCountRef.current) {
-							setState(value);
-						}
-					})
-					.catch((error) => {
-						if (runId === runCountRef.current) {
-							onError?.(error as E);
-						}
-					});
-				return;
-			}
-			if (typeof action === "function") {
-				setState((prev) => (action as (prev: A) => A)(prev));
-				return;
-			}
-			setState(action as A);
-		},
-		[runtime, onError],
-	);
+  const set = useCallback(
+    (action: SetStateAction<A, E, R>) => {
+      if (Effect.isEffect(action)) {
+        const runId = ++runCountRef.current
+        Runtime.runPromise(runtime)(action as Effect.Effect<A, E, R>)
+          .then((value) => {
+            if (runId === runCountRef.current) {
+              setState(value)
+            }
+          })
+          .catch((error) => {
+            if (runId === runCountRef.current) {
+              onError?.(error as E)
+            }
+          })
+        return
+      }
+      if (typeof action === 'function') {
+        setState((prev) => (action as (prev: A) => A)(prev))
+        return
+      }
+      setState(action as A)
+    },
+    [runtime, onError],
+  )
 
-	return [state, set];
+  return [state, set]
 }
