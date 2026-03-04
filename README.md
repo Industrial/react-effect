@@ -1,8 +1,8 @@
-# effect-react
+# react-effect
 
 Effect.ts integration for React. This library provides React hooks that run your logic as Effect programs instead of raw Promises or ad hoc async code. You get typed errors, composition, and Scope-based cleanup while keeping the same mental model as React’s built-in hooks.
 
-**npm package:** `effect-react` (the name `react-effect` is taken on npm). Install with `bun add effect-react` or `npm i effect-react`.
+**npm package:** `react-effect` (the name `react-effect` is taken on npm). Install with `bun add react-effect` or `npm i react-effect`.
 
 ---
 
@@ -43,7 +43,7 @@ Use it when you already use Effect and want consistent Effect semantics (errors,
 
 ## Hooks
 
-| React hook        | effect-react hook           | Notes |
+| React hook        | react-effect hook           | Notes |
 |-------------------|-----------------------------|--------|
 | `useTransition`   | `useTransitionEffect`       | `[isPending, startTransition]`; `startTransition` runs an `Effect`. |
 | `useActionState`  | `useActionStateEffect`      | `[state, dispatchAction, isPending]`; the action is an `Effect`; state/error/isPending from last run. |
