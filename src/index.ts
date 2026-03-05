@@ -15,6 +15,11 @@ export {
   type EffectRuntimeProviderProps,
 } from './EffectRuntime'
 export { useRunEffect } from './useRunEffect'
+export { useRunEffectDedupe } from './useRunEffectDedupe'
+export {
+  useRunEffectWithCache,
+  type UseRunEffectWithCacheResult,
+} from './useRunEffectWithCache'
 export { useTransitionEffect } from './useTransitionEffect'
 export { useActionStateEffect } from './useActionStateEffect'
 export { useOptimisticEffect } from './useOptimisticEffect'

@@ -2,9 +2,14 @@ import { useCallback } from 'react'
 import { Effect } from 'effect'
 import { useNavigate } from 'react-router-dom'
 
-/** Options for the Effect-returning navigator (mirrors React Router's NavigateOptions). */
+/**
+ * Options for the Effect-returning navigator returned by {@link useNavigateEffect}.
+ * Mirrors React Router's `NavigateOptions` (e.g. for `navigate(to, options)`).
+ */
 export interface NavigateEffectOptions {
+  /** When true, replace the current history entry instead of pushing. */
   replace?: boolean
+  /** Optional state to pass to the new location. */
   state?: unknown
 }
 

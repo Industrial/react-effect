@@ -37,14 +37,19 @@ import { useEffectRuntime } from './EffectRuntime'
  * ```tsx
  * startTransition(() => fetchUserEffect); // pass an Effect
  * ```
+ *
+ * @param runtime - Optional. Runtime to run effects with. If omitted, uses context.
  */
-export function useTransitionEffect<R = never>(): [
+export function useTransitionEffect<R = never>(
+  runtime?: Runtime.Runtime<R> | null,
+): [
   isPending: boolean,
   startTransition: <A, E>(
     fn: () => void | Promise<void> | Effect.Effect<A, E, R>,
   ) => void,
 ] {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   const [isPending, setIsPending] = useState(false)
   const runCountRef = useRef(0)
 
@@ -61,7 +66,8 @@ export function useTransitionEffect<R = never>(): [
             result !== null &&
             Effect.isEffect(result)
           ) {
-            await Runtime.runPromise(runtime)(result as Effect.Effect<A, E, R>)
+            if (resolvedRuntime === null) return
+            await Runtime.runPromise(resolvedRuntime)(result as Effect.Effect<A, E, R>)
           } else if (typeof (result as Promise<void>)?.then === 'function') {
             await (result as Promise<void>)
           }
@@ -76,7 +82,7 @@ export function useTransitionEffect<R = never>(): [
 
       run()
     },
-    [runtime],
+    [resolvedRuntime],
   )
 
   return [isPending, startTransition]

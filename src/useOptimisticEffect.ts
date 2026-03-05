@@ -32,10 +32,13 @@ import { useEffectRuntime } from './EffectRuntime'
  * ```tsx
  * setOptimistic(prev => prev + 1); // sync update, no Effect
  * ```
+ *
+ * @param runtime - Optional. Runtime to run the commit effect with. If omitted, uses context.
  */
 export function useOptimisticEffect<A, E, R = never>(
   initialValue: A,
   reducer?: (current: A, optimisticUpdate: A) => A,
+  runtime?: Runtime.Runtime<R> | null,
 ): [
   optimisticState: A,
   setOptimistic: (
@@ -43,7 +46,8 @@ export function useOptimisticEffect<A, E, R = never>(
     effect?: Effect.Effect<A, E, R>,
   ) => void,
 ] {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   const [committed, setCommitted] = useState<A>(initialValue)
   const [optimistic, setOptimisticState] = useState<A>(initialValue)
   const committedRef = useRef(initialValue)
@@ -67,7 +71,8 @@ export function useOptimisticEffect<A, E, R = never>(
       const runId = ++runCountRef.current
       const prevCommitted = committedRef.current
 
-      Runtime.runPromise(runtime)(effect)
+      if (resolvedRuntime === null) return
+      Runtime.runPromise(resolvedRuntime)(effect)
         .then((value) => {
           if (runId === runCountRef.current) {
             const next = reducer ? reducer(committedRef.current, value) : value
@@ -81,7 +86,7 @@ export function useOptimisticEffect<A, E, R = never>(
           }
         })
     },
-    [optimistic, reducer, runtime],
+    [optimistic, reducer, resolvedRuntime],
   )
 
   return [optimistic, setOptimistic]

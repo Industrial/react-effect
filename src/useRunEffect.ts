@@ -11,8 +11,13 @@ import { useEffectRuntime } from './EffectRuntime'
  * `useEffect(setup, deps)` with the setup expressed as an Effect and cleanup
  * handled via Scope.
  *
+ * @typeParam A - Success value type of the Effect (typically unused; effect is fire-and-forget).
+ * @typeParam E - Error type of the Effect (failures are ignored; use {@link useRunEffectWithCache} or similar for error handling).
+ * @typeParam R - Requirements (context) for the Effect; must be provided by the runtime.
  * @param effect - The Effect to run. It will be forked in a Scope so it can be interrupted on cleanup.
  * @param deps - Dependency list (same semantics as `useEffect`). When any value changes, the previous run is cleaned up and the effect runs again.
+ * @param runtime - Optional. Runtime to run the effect with. If omitted, uses the runtime from context ({@link EffectRuntimeProvider}). If `null`, the effect is not run.
+ * @returns Nothing. The effect runs asynchronously; success and failure are not exposed to the component.
  *
  * @example
  * ```tsx
@@ -29,13 +34,16 @@ import { useEffectRuntime } from './EffectRuntime'
 export function useRunEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
   deps: React.DependencyList,
+  runtime?: Runtime.Runtime<R> | null,
 ): void {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   type ScopeRef = Parameters<typeof Scope.close>[0]
   const scopeRef = useRef<ScopeRef | null>(null)
   const isMountedRef = useRef(true)
 
   useEffect(() => {
+    if (resolvedRuntime === null) return
     isMountedRef.current = true
     let cancelled = false
 
@@ -46,13 +54,13 @@ export function useRunEffect<A, E, R>(
           yield* Effect.fork(Scope.extend(effect, scope))
           return scope
         })
-        const scope = await Runtime.runPromise(runtime)(
+        const scope = await Runtime.runPromise(resolvedRuntime)(
           scoped as Effect.Effect<Scope.CloseableScope, never, R>,
         )
         if (!cancelled && isMountedRef.current) {
           scopeRef.current = scope
         } else {
-          Runtime.runPromise(runtime)(Scope.close(scope, Exit.void)).catch(
+          Runtime.runPromise(resolvedRuntime)(Scope.close(scope, Exit.void)).catch(
             () => {},
           )
         }
@@ -69,11 +77,11 @@ export function useRunEffect<A, E, R>(
       const scope = scopeRef.current
       scopeRef.current = null
       if (scope) {
-        Runtime.runPromise(runtime)(Scope.close(scope, Exit.void)).catch(
+        Runtime.runPromise(resolvedRuntime)(Scope.close(scope, Exit.void)).catch(
           () => {},
         )
       }
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: deps is the hook parameter; caller supplies the dependency list
-  }, deps)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: deps and optional runtime are the hook contract
+  }, [resolvedRuntime, ...deps])
 }

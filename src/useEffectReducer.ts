@@ -33,18 +33,22 @@ import { useEffectRuntime } from './EffectRuntime'
  *
  * dispatch({ type: "fetch", id: 1 });
  * ```
+ *
+ * @param runtime - Optional. Runtime to run reducer effects with. If omitted, uses context.
  */
 export function useEffectReducer<S, A, E = unknown, R = never>(
   reducer: (state: S, action: A) => Effect.Effect<S, E, R>,
   initialState: S,
   onError?: (error: E) => void,
+  runtime?: Runtime.Runtime<R> | null,
 ): [
   state: S,
   dispatch: (action: A) => void,
   isPending: boolean,
   error: E | null,
 ] {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   const [state, setState] = useState<S>(initialState)
   const stateRef = useRef(state)
   stateRef.current = state
@@ -54,12 +58,13 @@ export function useEffectReducer<S, A, E = unknown, R = never>(
 
   const dispatch = useCallback(
     (action: A) => {
+      if (resolvedRuntime === null) return
       const runId = ++runCountRef.current
       setIsPending(true)
       setError(null)
 
       const eff = reducer(stateRef.current, action)
-      Runtime.runPromise(runtime)(eff)
+      Runtime.runPromise(resolvedRuntime)(eff)
         .then((nextState) => {
           if (runId === runCountRef.current) {
             setState(nextState)
@@ -78,7 +83,7 @@ export function useEffectReducer<S, A, E = unknown, R = never>(
           }
         })
     },
-    [reducer, runtime, onError],
+    [reducer, resolvedRuntime, onError],
   )
 
   return [state, dispatch, isPending, error]

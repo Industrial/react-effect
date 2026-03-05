@@ -35,23 +35,28 @@ import { failure, idle, pending, success } from './AsyncState'
  *   </>
  * );
  * ```
+ *
+ * @param runtime - Optional. Runtime to run the action effect with. If omitted, uses context.
  */
 export function useActionStateEffect<A, E, R = never>(
   action: (prev: AsyncState<A, E>) => Effect.Effect<A, E, R>,
   initialState: AsyncState<A, E> = idle<A, E>(),
+  runtime?: Runtime.Runtime<R> | null,
 ): [state: AsyncState<A, E>, dispatchAction: () => void, isPending: boolean] {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   const [state, setState] = useState<AsyncState<A, E>>(initialState)
   const stateRef = useRef(state)
   stateRef.current = state
   const runCountRef = useRef(0)
 
   const dispatchAction = useCallback(() => {
+    if (resolvedRuntime === null) return
     const runId = ++runCountRef.current
     setState(pending<A, E>())
 
     const eff = action(stateRef.current)
-    Runtime.runPromise(runtime)(eff)
+    Runtime.runPromise(resolvedRuntime)(eff)
       .then((value) => {
         if (runId === runCountRef.current) {
           setState(success(value))
@@ -62,7 +67,7 @@ export function useActionStateEffect<A, E, R = never>(
           setState(failure(error))
         }
       })
-  }, [action, runtime])
+  }, [action, resolvedRuntime])
 
   const isPending = state._tag === 'pending'
 

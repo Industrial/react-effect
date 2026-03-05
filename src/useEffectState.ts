@@ -2,10 +2,22 @@ import { Effect, Runtime } from 'effect'
 import { useCallback, useRef, useState } from 'react'
 import { useEffectRuntime } from './EffectRuntime'
 
-/** Accepted argument for the setter returned by {@link useEffectState}. */
+/**
+ * Accepted argument for the setter returned by {@link useEffectState}.
+ * Can be a direct value, an updater function, or an Effect (which is run then applied on success).
+ *
+ * @internal
+ */
 type SetStateAction<A, E, R> = A | ((prev: A) => A) | Effect.Effect<A, E, R>
 
-/** Effect-returning setter for use in Effect.gen (e.g. yield* setStateAsEffect(null)). */
+/**
+ * Effect-returning setter for use in Effect.gen.
+ * Accepts a value or updater (same as the main setter) and returns an
+ * `Effect<void, never, never>` so you can compose state updates inside
+ * Effect programs: `yield* setStateAsEffect(null)` or `yield* setStateAsEffect(prev => prev + 1)`.
+ *
+ * @typeParam A - State value type.
+ */
 export type SetStateAsEffect<A> = (
   action: A | ((prev: A) => A),
 ) => Effect.Effect<void, never, never>
@@ -41,20 +53,25 @@ export type SetStateAsEffect<A> = (
  * setUser(fetchUser(id));               // Effect: runs then sets on success
  * yield* setUserAsEffect(null);         // inside Effect.gen: compose state update as effect
  * ```
+ *
+ * @param runtime - Optional. Runtime to run Effects passed to the setter. If omitted, uses context.
  */
 export function useEffectState<A, E = unknown, R = never>(
   initialState: A | (() => A),
   onError?: (error: E) => void,
+  runtime?: Runtime.Runtime<R> | null,
 ): [A, (action: SetStateAction<A, E, R>) => void, SetStateAsEffect<A>] {
-  const { runtime } = useEffectRuntime<R>()
+  const resolvedRuntime =
+    runtime !== undefined ? runtime : useEffectRuntime<R>().runtime
   const [state, setState] = useState<A>(initialState)
   const runCountRef = useRef(0)
 
   const set = useCallback(
     (action: SetStateAction<A, E, R>) => {
       if (Effect.isEffect(action)) {
+        if (resolvedRuntime === null) return
         const runId = ++runCountRef.current
-        Runtime.runPromise(runtime)(action as Effect.Effect<A, E, R>)
+        Runtime.runPromise(resolvedRuntime)(action as Effect.Effect<A, E, R>)
           .then((value) => {
             if (runId === runCountRef.current) {
               setState(value)
@@ -71,9 +88,9 @@ export function useEffectState<A, E = unknown, R = never>(
         setState((prev) => (action as (prev: A) => A)(prev))
         return
       }
-      setState(action as A)
+        setState(action as A)
     },
-    [runtime, onError],
+    [resolvedRuntime, onError],
   )
 
   const setAsEffect = useCallback((action: A | ((prev: A) => A)) => {
