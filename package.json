@@ -25,7 +25,8 @@
   },
   "peerDependencies": {
     "effect": ">=3.0.0",
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "react-router-dom": ">=6.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",
@@ -33,6 +34,7 @@
     "@types/react": "^18.2.0",
     "effect": "^3.11.0",
     "react": "^18.2.0",
+    "react-router-dom": "^6.0.0",
     "typescript": "^5.2.0"
   },
   "keywords": [
