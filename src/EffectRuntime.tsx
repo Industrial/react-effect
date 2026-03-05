@@ -2,7 +2,7 @@ import { type Runtime, Runtime as RuntimeModule } from 'effect'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
 /**
- * Context value holding the Effect runtime used by all react-effect hooks.
+ * Context value holding the Effect runtime used by all react-effect-hooks hooks.
  *
  * The runtime is provided once via {@link EffectRuntimeProvider}; hooks call
  * {@link useEffectRuntime} to obtain it and run or fork Effects. This allows
@@ -30,7 +30,7 @@ export interface EffectRuntimeProviderProps<R> {
    * Pass a runtime built with Layers when your Effects require services (e.g. HttpClient).
    */
   readonly runtime?: Runtime.Runtime<R>
-  /** Child tree that can use react-effect hooks. */
+  /** Child tree that can use react-effect-hooks hooks. */
   readonly children: ReactNode
 }
 
@@ -39,7 +39,7 @@ const defaultRuntime = RuntimeModule.defaultRuntime as Runtime.Runtime<never>
 /**
  * Provides the Effect runtime to the subtree so that hooks can run Effects.
  *
- * Wrap your app (or the subtree that uses react-effect hooks) with this provider.
+ * Wrap your app (or the subtree that uses react-effect-hooks hooks) with this provider.
  * If `runtime` is not passed, Effect's default runtime is used. Pass a custom
  * runtime when your Effects have requirements (e.g. from Layers).
  *

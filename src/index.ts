@@ -1,5 +1,5 @@
 /**
- * react-effect – Effect.ts integration for React.
+ * react-effect-hooks – Effect.ts integration for React.
  *
  * Provides hooks and a shared runtime that mirror React's built-in hooks
  * (including React 19 patterns like useTransition, useActionState, useOptimistic)
