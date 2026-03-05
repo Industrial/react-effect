@@ -1,6 +1,6 @@
 {
   "name": "react-effect-hooks",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Effect.ts integration for React – hooks and runtime mirroring useTransition, useActionState, useOptimistic, and more",
   "type": "module",
   "main": "dist/index.js",
