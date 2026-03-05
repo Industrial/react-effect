@@ -18,7 +18,7 @@ export { useRunEffect } from './useRunEffect'
 export { useTransitionEffect } from './useTransitionEffect'
 export { useActionStateEffect } from './useActionStateEffect'
 export { useOptimisticEffect } from './useOptimisticEffect'
-export { useEffectState } from './useEffectState'
+export { useEffectState, type SetStateAsEffect } from './useEffectState'
 export { useEffectReducer } from './useEffectReducer'
 export {
   type AsyncState,
@@ -31,3 +31,5 @@ export {
   isSuccess,
   isFailure,
 } from './AsyncState'
+export { streamWithPendingState } from './streamWithPendingState'
+export { runStreamInto } from './runStreamInto'

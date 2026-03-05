@@ -5,6 +5,11 @@ import { useEffectRuntime } from './EffectRuntime'
 /** Accepted argument for the setter returned by {@link useEffectState}. */
 type SetStateAction<A, E, R> = A | ((prev: A) => A) | Effect.Effect<A, E, R>
 
+/** Effect-returning setter for use in Effect.gen (e.g. yield* setStateAsEffect(null)). */
+export type SetStateAsEffect<A> = (
+  action: A | ((prev: A) => A),
+) => Effect.Effect<void, never, never>
+
 /**
  * Mirrors React's `useState`, but the setter can accept a value, an updater
  * function, or an Effect.
@@ -17,26 +22,30 @@ type SetStateAction<A, E, R> = A | ((prev: A) => A) | Effect.Effect<A, E, R>
  * Use this when some updates are effectful (e.g. fetch then set) and you want
  * a single, consistent setter API.
  *
+ * The third element of the tuple is a setter that returns an Effect so you can
+ * compose it in Effect.gen: `yield* setStateAsEffect(null)`.
+ *
  * @typeParam A - State value type.
  * @typeParam E - Error type when the setter receives an Effect (default: `unknown`).
  * @typeParam R - Requirements for the Effect (from context runtime).
  * @param initialState - Initial state or a lazy initializer `() => A`.
  * @param onError - Optional. Called when an Effect passed to the setter fails.
- * @returns Tuple `[state, setState]`; `setState` accepts `A`, `(prev => A)`, or `Effect<A, E, R>`.
+ * @returns Tuple `[state, setState, setStateAsEffect]`; `setStateAsEffect(value)` returns `Effect<void>` so you can `yield*` it.
  *
  * @example
  * ```tsx
- * const [user, setUser] = useEffectState<User | null>(null, (e) => toast.error(String(e)));
+ * const [user, setUser, setUserAsEffect] = useEffectState<User | null>(null, (e) => toast.error(String(e)));
  *
  * setUser(await fetchUser(id));        // sync: setUser(value)
  * setUser(prev => prev ?? defaultUser); // updater
- * setUser(fetchUser(id));               // Effect: runs then sets on success, calls onError on failure
+ * setUser(fetchUser(id));               // Effect: runs then sets on success
+ * yield* setUserAsEffect(null);         // inside Effect.gen: compose state update as effect
  * ```
  */
 export function useEffectState<A, E = unknown, R = never>(
   initialState: A | (() => A),
   onError?: (error: E) => void,
-): [A, (action: SetStateAction<A, E, R>) => void] {
+): [A, (action: SetStateAction<A, E, R>) => void, SetStateAsEffect<A>] {
   const { runtime } = useEffectRuntime<R>()
   const [state, setState] = useState<A>(initialState)
   const runCountRef = useRef(0)
@@ -67,5 +76,15 @@ export function useEffectState<A, E = unknown, R = never>(
     [runtime, onError],
   )
 
-  return [state, set]
+  const setAsEffect = useCallback((action: A | ((prev: A) => A)) => {
+    return Effect.sync(() => {
+      if (typeof action === 'function') {
+        setState((prev) => (action as (prev: A) => A)(prev))
+      } else {
+        setState(action as A)
+      }
+    })
+  }, [])
+
+  return [state, set, setAsEffect]
 }
